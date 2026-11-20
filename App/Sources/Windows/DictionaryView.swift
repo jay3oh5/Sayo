@@ -220,9 +220,21 @@ struct DictionaryView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    private var footerCountText: String {
+        let words = entries.filter { $0.isSnippet != true }.count
+        let snippets = entries.filter { $0.isSnippet == true }.count
+        if snippets > 0 && words > 0 {
+            return "\(words) \(words == 1 ? "word" : "words"), \(snippets) \(snippets == 1 ? "snippet" : "snippets")"
+        } else if snippets > 0 {
+            return "\(snippets) \(snippets == 1 ? "snippet" : "snippets")"
+        } else {
+            return "\(words) \(words == 1 ? "word" : "words")"
+        }
+    }
+
     private var footer: some View {
         HStack {
-            Text(feedback ?? "\(entries.count) \(entries.count == 1 ? "word" : "words")")
+            Text(feedback ?? footerCountText)
                 .font(JotUI.TypeScale.labelSmall(grad: grad))
                 .foregroundStyle(feedback == nil ? JotUI.Colors.onSurfaceVariant : JotUI.Colors.primary)
             Spacer()
@@ -276,16 +288,16 @@ struct DictionaryView: View {
         let count = store.importCSV(csv)
         Log.ui.info("Dictionary: imported \(count) entries")
         reload()
-        showFeedback(count == 0 ? "Nothing new to import" : "Imported \(count) \(count == 1 ? "word" : "words")")
+        showFeedback(count == 0 ? "Nothing new to import" : "Imported \(count) \(count == 1 ? "entry" : "entries")")
     }
 
     private func exportCSV() {
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = "jot-dictionary.csv"
+        panel.nameFieldStringValue = "sayo-dictionary.csv"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             try store.exportCSV().write(to: url, atomically: true, encoding: .utf8)
-            showFeedback("Exported \(entries.count) \(entries.count == 1 ? "word" : "words")")
+            showFeedback("Exported \(entries.count) \(entries.count == 1 ? "entry" : "entries")")
         } catch {
             Log.ui.error("Dictionary export failed: \(error)")
             showFeedback("Export failed — couldn't write the file")
