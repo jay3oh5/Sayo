@@ -99,7 +99,21 @@ struct HistoryPane: View {
                 TextField("Search your dictations", text: $query)
                     .textFieldStyle(.plain)
                     .font(JotUI.TypeScale.body(grad: grad))
+                    .accessibilityLabel("Search your dictations")
                     .onChange(of: query) { _, _ in reload() }
+                if !query.isEmpty {
+                    Button {
+                        query = ""
+                        reload()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Clear search")
+                    .accessibilityLabel("Clear search")
+                }
             }
             .padding(.horizontal, JotUI.Spacing.s)
             .padding(.vertical, 7)
@@ -368,18 +382,35 @@ struct HistoryPane: View {
     private var emptyState: some View {
         VStack(spacing: JotUI.Spacing.m) {
             Spacer()
-            HStack(spacing: 5) {
-                ForEach(0..<4, id: \.self) { index in
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(JotUI.Colors.brandQuad[index])
-                        .frame(width: 6, height: [18, 30, 24, 14][index])
+            if query.isEmpty {
+                HStack(spacing: 5) {
+                    ForEach(0..<4, id: \.self) { index in
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(JotUI.Colors.brandQuad[index])
+                            .frame(width: 6, height: [18, 30, 24, 14][index])
+                    }
                 }
+                Text("Nothing here yet")
+                    .font(JotUI.TypeScale.title(grad: grad))
+                Text("Hold \(SettingsStore().hotkeyKey.displayName) and say hello.")
+                    .font(JotUI.TypeScale.body(grad: grad))
+                    .foregroundStyle(.secondary)
+            } else {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 28))
+                    .foregroundStyle(.secondary)
+                Text("No results for “\(query)”")
+                    .font(JotUI.TypeScale.title(grad: grad))
+                Text("Check your spelling or clear the search filter.")
+                    .font(JotUI.TypeScale.body(grad: grad))
+                    .foregroundStyle(.secondary)
+                Button("Clear Search") {
+                    query = ""
+                    reload()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
             }
-            Text("Nothing here yet")
-                .font(JotUI.TypeScale.title(grad: grad))
-            Text("Hold fn and say hello.")
-                .font(JotUI.TypeScale.body(grad: grad))
-                .foregroundStyle(.secondary)
             Spacer()
         }
         .frame(maxWidth: .infinity)
@@ -388,10 +419,11 @@ struct HistoryPane: View {
     // MARK: - Actions
 
     private func exportHistory() {
-        guard !records.isEmpty else { return }
+        let validRecords = records.filter { !$0.displayText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        guard !validRecords.isEmpty else { return }
         var markdown = ""
-        for record in records {
-            let time = record.startedAt.formatted(date: .omitted, time: .shortened)
+        for record in validRecords {
+            let time = record.startedAt.formatted(date: .abbreviated, time: .shortened)
             let app = record.targetAppName ?? "Unknown App"
             let transcript = record.displayText
             markdown += "### [\(time)] - [\(app)]\n\n\(transcript)\n\n"
@@ -430,8 +462,11 @@ private struct RecordDetailSheet: View {
     @Environment(\.colorScheme) private var scheme
     @State private var showRaw = false
     @State private var player: AVAudioPlayer?
+    @State private var isPlaying = false
     @State private var playbackRate: Float = 1.0
     @State private var currentTime: TimeInterval = 0
+    @State private var isDraggingSlider = false
+    @State private var dragTime: TimeInterval = 0
     private let timer = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
     private var grad: CGFloat { scheme == .dark ? 25 : 0 }
 
@@ -469,8 +504,9 @@ private struct RecordDetailSheet: View {
             }
             .frame(minHeight: 120, maxHeight: 260)
 
+            audioSection
+
             HStack(spacing: JotUI.Spacing.s) {
-                audioButton
                 Button("Retry Transcription") { onRetry() }
                 Spacer()
                 Button(role: .destructive) { onDelete() } label: {
@@ -519,16 +555,23 @@ private struct RecordDetailSheet: View {
         .onDisappear {
             player?.stop()
             player = nil
+            isPlaying = false
             currentTime = 0
+            isDraggingSlider = false
         }
         .onReceive(timer) { _ in
             if let p = player {
                 if p.isPlaying {
-                    currentTime = p.currentTime
-                } else if currentTime > 0 {
-                    // Audio playback finished naturally
-                    player = nil
-                    currentTime = 0
+                    isPlaying = true
+                    if !isDraggingSlider {
+                        currentTime = p.currentTime
+                    }
+                } else if isPlaying {
+                    // Playback reached end
+                    isPlaying = false
+                    if !isDraggingSlider {
+                        currentTime = p.duration
+                    }
                 }
             }
         }
@@ -545,56 +588,105 @@ private struct RecordDetailSheet: View {
     }
 
     @ViewBuilder
-    private var audioButton: some View {
+    private var audioSection: some View {
         let cafURL = FileLayout.audioCAF(in: record.folderURL)
         if FileManager.default.fileExists(atPath: cafURL.path) {
-            HStack(spacing: JotUI.Spacing.m) {
-                Button {
-                    if player?.isPlaying == true {
-                        player?.stop()
-                        player = nil
-                        currentTime = 0
-                    } else {
-                        if player == nil {
-                            player = try? AVAudioPlayer(contentsOf: cafURL)
-                            player?.enableRate = true
-                        }
-                        player?.rate = playbackRate
-                        if player?.play() != true {
-                            player = nil
+            VStack(alignment: .leading, spacing: JotUI.Spacing.xs) {
+                HStack(spacing: JotUI.Spacing.s) {
+                    Button {
+                        togglePlay(cafURL: cafURL)
+                    } label: {
+                        Label(isPlaying ? "Pause" : "Play Audio",
+                              systemImage: isPlaying ? "pause.fill" : "play.fill")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+
+                    if player != nil {
+                        Button {
+                            player?.stop()
+                            player?.currentTime = 0
                             currentTime = 0
+                            isPlaying = false
+                        } label: {
+                            Image(systemName: "stop.fill")
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .help("Stop and rewind")
+
+                        Picker("", selection: $playbackRate) {
+                            Text("1x").tag(Float(1.0))
+                            Text("1.25x").tag(Float(1.25))
+                            Text("1.5x").tag(Float(1.5))
+                            Text("2x").tag(Float(2.0))
+                        }
+                        .pickerStyle(.segmented)
+                        .frame(width: 140)
+                        .onChange(of: playbackRate) { _, newRate in
+                            player?.rate = newRate
                         }
                     }
-                } label: {
-                    Label(player?.isPlaying == true ? "Stop" : "Play Audio",
-                          systemImage: player?.isPlaying == true ? "stop.fill" : "play.fill")
+                    Spacer()
                 }
-                
-                if player != nil {
-                    Picker("", selection: $playbackRate) {
-                        Text("1x").tag(Float(1.0))
-                        Text("1.25x").tag(Float(1.25))
-                        Text("1.5x").tag(Float(1.5))
-                        Text("2x").tag(Float(2.0))
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(width: 140)
-                    .onChange(of: playbackRate) { _, newRate in
-                        player?.rate = newRate
-                    }
-                    
-                    if let duration = player?.duration {
-                        Text("\(formatTime(currentTime)) / \(formatTime(duration))")
+
+                if let duration = player?.duration, duration > 0 {
+                    HStack(spacing: JotUI.Spacing.s) {
+                        Slider(
+                            value: Binding(
+                                get: { isDraggingSlider ? dragTime : currentTime },
+                                set: { newValue in dragTime = newValue }
+                            ),
+                            in: 0...duration,
+                            onEditingChanged: { editing in
+                                isDraggingSlider = editing
+                                if !editing {
+                                    player?.currentTime = dragTime
+                                    currentTime = dragTime
+                                }
+                            }
+                        )
+                        .controlSize(.small)
+
+                        Text("\(formatTime(isDraggingSlider ? dragTime : currentTime)) / \(formatTime(duration))")
                             .font(JotUI.TypeScale.labelSmall(grad: grad))
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
                     }
+                    .padding(.top, 2)
                 }
             }
+            .padding(.vertical, 2)
         } else {
             Text("Audio removed by retention policy")
                 .font(JotUI.TypeScale.labelSmall(grad: grad))
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    private func ensurePlayer(cafURL: URL) -> AVAudioPlayer? {
+        if let player { return player }
+        guard let p = try? AVAudioPlayer(contentsOf: cafURL) else { return nil }
+        p.enableRate = true
+        p.prepareToPlay()
+        player = p
+        return p
+    }
+
+    private func togglePlay(cafURL: URL) {
+        guard let p = ensurePlayer(cafURL: cafURL) else { return }
+        if p.isPlaying {
+            p.pause()
+            isPlaying = false
+        } else {
+            p.rate = playbackRate
+            if p.currentTime >= p.duration {
+                p.currentTime = 0
+                currentTime = 0
+            }
+            if p.play() {
+                isPlaying = true
+            }
         }
     }
     
