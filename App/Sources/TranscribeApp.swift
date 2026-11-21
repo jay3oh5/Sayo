@@ -15,7 +15,7 @@
 import SwiftUI
 
 @main
-struct SayoApp: App {
+struct JotApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {

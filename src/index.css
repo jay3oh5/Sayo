@@ -1,0 +1,60 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  html {
+    font-family: var(--font-sans);
+  }
+
+  code, pre, .font-mono {
+    font-family: var(--font-mono);
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes sayo-sweep {
+  0% {
+    background-position: -120% 0;
+  }
+  100% {
+    background-position: 220% 0;
+  }
+}
+
+.sayo-gemini-sweep {
+  background-image: linear-gradient(
+    90deg,
+    currentColor 0%,
+    currentColor 30%,
+    #4285F4 44%,
+    #9B72CB 52%,
+    #D96570 60%,
+    currentColor 74%,
+    currentColor 100%
+  );
+  background-size: 240% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: sayo-sweep 1.25s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes sayo-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-4px); }
+  40% { transform: translateX(4px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+
+.sayo-shake {
+  animation: sayo-shake 0.28s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}

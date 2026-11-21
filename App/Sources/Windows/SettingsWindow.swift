@@ -23,6 +23,7 @@ import JotCore
 /// Your data (History, Dictionary) on top; app configuration below.
 @MainActor
 final class MainWindowController: NSWindowController {
+    private var hosting: NSHostingView<MainView>?
     private let model: MainWindowModel
     private var titleObserver: AnyCancellable?
 
@@ -34,11 +35,10 @@ final class MainWindowController: NSWindowController {
         model = MainWindowModel()
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 880, height: 580),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
-        window.minSize = NSSize(width: 880, height: 580)
         window.title = model.selection.title
         window.titlebarAppearsTransparent = true
         window.center()

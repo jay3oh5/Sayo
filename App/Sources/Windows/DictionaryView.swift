@@ -173,33 +173,6 @@ struct DictionaryView: View {
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
         .searchable(text: $search, placement: .automatic, prompt: "Search")
-        .overlay {
-            if filtered.isEmpty && !entries.isEmpty {
-                searchEmptyState
-            }
-        }
-    }
-
-    private var searchEmptyState: some View {
-        VStack(spacing: JotUI.Spacing.s) {
-            Spacer()
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 28))
-                .foregroundStyle(JotUI.Colors.onSurfaceVariant)
-            Text("No results for “\(search)”")
-                .font(JotUI.TypeScale.title(grad: grad))
-                .foregroundStyle(JotUI.Colors.onSurface)
-            Text("Check your spelling or clear the search filter.")
-                .font(JotUI.TypeScale.body(grad: grad))
-                .foregroundStyle(JotUI.Colors.onSurfaceVariant)
-            Button("Clear Search") {
-                search = ""
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var emptyState: some View {
@@ -220,21 +193,9 @@ struct DictionaryView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var footerCountText: String {
-        let words = entries.filter { $0.isSnippet != true }.count
-        let snippets = entries.filter { $0.isSnippet == true }.count
-        if snippets > 0 && words > 0 {
-            return "\(words) \(words == 1 ? "word" : "words"), \(snippets) \(snippets == 1 ? "snippet" : "snippets")"
-        } else if snippets > 0 {
-            return "\(snippets) \(snippets == 1 ? "snippet" : "snippets")"
-        } else {
-            return "\(words) \(words == 1 ? "word" : "words")"
-        }
-    }
-
     private var footer: some View {
         HStack {
-            Text(feedback ?? footerCountText)
+            Text(feedback ?? "\(entries.count) \(entries.count == 1 ? "word" : "words")")
                 .font(JotUI.TypeScale.labelSmall(grad: grad))
                 .foregroundStyle(feedback == nil ? JotUI.Colors.onSurfaceVariant : JotUI.Colors.primary)
             Spacer()
@@ -288,16 +249,16 @@ struct DictionaryView: View {
         let count = store.importCSV(csv)
         Log.ui.info("Dictionary: imported \(count) entries")
         reload()
-        showFeedback(count == 0 ? "Nothing new to import" : "Imported \(count) \(count == 1 ? "entry" : "entries")")
+        showFeedback(count == 0 ? "Nothing new to import" : "Imported \(count) \(count == 1 ? "word" : "words")")
     }
 
     private func exportCSV() {
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = "sayo-dictionary.csv"
+        panel.nameFieldStringValue = "jot-dictionary.csv"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             try store.exportCSV().write(to: url, atomically: true, encoding: .utf8)
-            showFeedback("Exported \(entries.count) \(entries.count == 1 ? "entry" : "entries")")
+            showFeedback("Exported \(entries.count) \(entries.count == 1 ? "word" : "words")")
         } catch {
             Log.ui.error("Dictionary export failed: \(error)")
             showFeedback("Export failed — couldn't write the file")

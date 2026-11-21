@@ -1,0 +1,10 @@
+{
+  "name": "Sayo",
+  "description": "Smart dictation powered by Gemini 3.5 Transcribe with floating pill HUD, History audio scrubbing, multi-line voice snippets, and customizable per-app tone matching.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
